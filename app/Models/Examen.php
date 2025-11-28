@@ -1,0 +1,16 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Examen extends Model
+{
+    protected $table = 'examenes'; // 👈 SOLUCIONA EL ERROR
+
+    protected $fillable = [
+        'nombre',
+        'categoria',
+        'descripcion',
+    ];
+}
