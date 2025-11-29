@@ -178,4 +178,11 @@ class PacienteController extends Controller
 
         return back()->with('success', 'Paciente reactivado correctamente.');
     }
+
+    public function verPaciente($id)
+{
+    $paciente = Paciente::findOrFail($id);
+    return view('pacientes.showpaciente', compact('paciente'));
+}
+
 }

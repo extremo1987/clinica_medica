@@ -168,7 +168,7 @@
                             <td>{{ $p->edad ? $p->edad . ' años' : '—' }}</td>
                             <td class="text-end">
 
-                            <a href="{{ route('pacientes.show',$p->id) }}"
+                            <a href="{{ route('pacientes.showpaciente',$p->id) }}"
                             class="btn btn-sm btn-info">Ver</a>
 
                             <a href="{{ route('pacientes.edit',$p->id) }}"

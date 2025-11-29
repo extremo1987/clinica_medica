@@ -12,6 +12,9 @@ use PDF;
 
 class ConsultaController extends Controller
 {
+    // ============================================================
+    // CREAR CONSULTA
+    // ============================================================
     public function create($pacienteId)
     {
         $paciente = Paciente::findOrFail($pacienteId);
@@ -19,17 +22,17 @@ class ConsultaController extends Controller
     }
 
     // ============================================================
-    // GUARDAR CONSULTA (CORREGIDO)
+    // GUARDAR CONSULTA
     // ============================================================
     public function store(Request $request, $pacienteId)
     {
         $paciente = Paciente::findOrFail($pacienteId);
 
-        // VALIDACIÓN BASE
         $data = $request->validate([
             'fecha_consulta' => 'nullable|date',
             'motivo' => 'nullable|string',
 
+            // Signos vitales
             'peso' => 'nullable|numeric',
             'estatura' => 'nullable|numeric',
             'presion_arterial' => 'nullable|string|max:20',
@@ -38,88 +41,68 @@ class ConsultaController extends Controller
             'temperatura' => 'nullable|numeric',
             'saturacion_o2' => 'nullable|integer',
 
+            // Diagnóstico
             'diagnostico' => 'nullable|string',
             'cie10' => 'nullable|string|max:50',
 
+            // Tratamiento / receta
             'tratamiento' => 'nullable|string',
             'receta' => 'nullable|string',
 
-            // YA NO forzamos array → lo convertimos manualmente
-            'examenes' => 'nullable',
+            // Exámenes
+            'examenes' => 'nullable|array',
 
+            // Incapacidad
             'dias_incapacidad' => 'nullable|integer',
             'incapacidad_inicio' => 'nullable|date',
             'incapacidad_fin' => 'nullable|date',
             'incapacidad_detalle' => 'nullable|string',
 
+            // Remisión
             'hospital_destino' => 'nullable|string',
             'motivo_remision' => 'nullable|string',
             'remision_detalle' => 'nullable|string',
 
+            // Pago
             'monto' => 'nullable|numeric',
             'tipo_pago' => 'nullable|string|max:50',
-            'pagado' => 'nullable',
+            'pagado' => 'nullable|boolean',
 
+            // Archivos
             'archivos.*' => 'nullable|file|max:20480',
             'observaciones_archivo.*' => 'nullable|string',
         ]);
 
-        // FECHA
+        // Fecha automática si no envían
         if (empty($data['fecha_consulta'])) {
             $data['fecha_consulta'] = Carbon::now();
         }
 
-        // NORMALIZACIÓN DE PAGADO
-        $data['pagado'] = $request->has('pagado') ? true : false;
-
-        // NORMALIZAR EXÁMENES DESDE TAGIFY
-        if (!empty($request->examenes)) {
-            // si viene JSON string
-            if (is_string($request->examenes)) {
-                $decoded = json_decode($request->examenes, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    // convertir [{"value":"Hemograma"}] → ["Hemograma"]
-                    $data['examenes'] = array_map(
-                        fn($e) => $e['value'] ?? $e,
-                        $decoded
-                    );
-                } else {
-                    // caso extraño: texto separado por comas
-                    $data['examenes'] = array_map('trim', explode(',', $request->examenes));
-                }
-            } else {
-                $data['examenes'] = $request->examenes;
-            }
-        } else {
-            $data['examenes'] = [];
-        }
-
-        // PREVENIR ERROR DE MONTO NULL
-        $data['monto'] = $data['monto'] ?? 0;
-
         $data['paciente_id'] = $pacienteId;
+        $data['pagado'] = !empty($data['pagado']);
+        $data['examenes'] = $data['examenes'] ?? [];
 
-        // CREAR CONSULTA
+        // Crear consulta
         $consulta = Consulta::create($data);
 
-        // ==============================================
-        // ARCHIVOS
-        // ==============================================
-        if ($request->hasFile('archivos')) {
-            foreach ($request->file('archivos') as $i => $file) {
+        // ==========================
+        // GUARDAR ARCHIVOS
+        // ==========================
+        $archivos = $request->file('archivos');
 
-                if ($file && $file->isValid()) {
-                    $ruta = $file->store('consultas_archivos', 'public');
+        if ($archivos && is_array($archivos)) {
+            foreach ($archivos as $i => $file) {
+                if (!$file) continue;
 
-                    ConsultaArchivo::create([
-                        'consulta_id' => $consulta->id,
-                        'nombre_archivo' => $file->getClientOriginalName(),
-                        'ruta_archivo' => $ruta,
-                        'tipo_archivo' => $file->getMimeType(),
-                        'observacion' => $request->observaciones_archivo[$i] ?? null,
-                    ]);
-                }
+                $ruta = $file->store('consultas_archivos', 'public');
 
+                ConsultaArchivo::create([
+                    'consulta_id' => $consulta->id,
+                    'nombre_archivo' => $file->getClientOriginalName(),
+                    'ruta_archivo' => $ruta,
+                    'tipo_archivo' => $file->getMimeType(),
+                    'observacion' => $request->observaciones_archivo[$i] ?? null,
+                ]);
             }
         }
 
@@ -129,7 +112,7 @@ class ConsultaController extends Controller
     }
 
     // ============================================================
-    // VER CONSULTA
+    // MOSTRAR CONSULTA
     // ============================================================
     public function show($id)
     {
@@ -138,7 +121,7 @@ class ConsultaController extends Controller
     }
 
     // ============================================================
-    // EDITAR
+    // EDITAR CONSULTA
     // ============================================================
     public function edit($id)
     {
@@ -149,7 +132,7 @@ class ConsultaController extends Controller
     }
 
     // ============================================================
-    // ACTUALIZAR CONSULTA (CORREGIDO IGUAL QUE STORE)
+    // ACTUALIZAR CONSULTA
     // ============================================================
     public function update(Request $request, $id)
     {
@@ -159,6 +142,7 @@ class ConsultaController extends Controller
             'fecha_consulta' => 'nullable|date',
             'motivo' => 'nullable|string',
 
+            // Signos vitales
             'peso' => 'nullable|numeric',
             'estatura' => 'nullable|numeric',
             'presion_arterial' => 'nullable|string|max:20',
@@ -167,71 +151,61 @@ class ConsultaController extends Controller
             'temperatura' => 'nullable|numeric',
             'saturacion_o2' => 'nullable|integer',
 
+            // Diagnóstico
             'diagnostico' => 'nullable|string',
             'cie10' => 'nullable|string|max:50',
 
+            // Tratamiento / receta
             'tratamiento' => 'nullable|string',
             'receta' => 'nullable|string',
 
-            'examenes' => 'nullable',
+            // Exámenes
+            'examenes' => 'nullable|array',
 
+            // Incapacidad
             'dias_incapacidad' => 'nullable|integer',
             'incapacidad_inicio' => 'nullable|date',
             'incapacidad_fin' => 'nullable|date',
             'incapacidad_detalle' => 'nullable|string',
 
+            // Remisión
             'hospital_destino' => 'nullable|string',
             'motivo_remision' => 'nullable|string',
             'remision_detalle' => 'nullable|string',
 
+            // Pago
             'monto' => 'nullable|numeric',
             'tipo_pago' => 'nullable|string|max:50',
-            'pagado' => 'nullable',
+            'pagado' => 'nullable|boolean',
 
+            // Archivos
             'archivos.*' => 'nullable|file|max:20480',
             'observaciones_archivo.*' => 'nullable|string',
         ]);
 
-        $data['pagado'] = $request->has('pagado');
-
-        if (!empty($request->examenes)) {
-            if (is_string($request->examenes)) {
-                $decoded = json_decode($request->examenes, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $data['examenes'] = array_map(
-                        fn($e) => $e['value'] ?? $e,
-                        $decoded
-                    );
-                } else {
-                    $data['examenes'] = array_map('trim', explode(',', $request->examenes));
-                }
-            } else {
-                $data['examenes'] = $request->examenes;
-            }
-        } else {
-            $data['examenes'] = [];
-        }
-
-        $data['monto'] = $data['monto'] ?? 0;
+        $data['pagado'] = !empty($data['pagado']);
+        $data['examenes'] = $data['examenes'] ?? [];
 
         $consulta->update($data);
 
-        // ARCHIVOS
-        if ($request->hasFile('archivos')) {
-            foreach ($request->file('archivos') as $i => $file) {
-                if ($file && $file->isValid()) {
+        // ==========================
+        // ARCHIVOS NUEVOS
+        // ==========================
+        $archivos = $request->file('archivos');
 
-                    $ruta = $file->store('consultas_archivos', 'public');
+        if ($archivos && is_array($archivos)) {
+            foreach ($archivos as $i => $file) {
+                if (!$file) continue;
 
-                    ConsultaArchivo::create([
-                        'consulta_id' => $consulta->id,
-                        'nombre_archivo' => $file->getClientOriginalName(),
-                        'ruta_archivo' => $ruta,
-                        'tipo_archivo' => $file->getMimeType(),
-                        'observacion' => $request->observaciones_archivo[$i] ?? null,
-                    ]);
+                $ruta = $file->store('consultas_archivos', 'public');
 
-                }
+                ConsultaArchivo::create([
+                    'consulta_id' => $consulta->id,
+                    'nombre_archivo' => $file->getClientOriginalName(),
+                    'ruta_archivo' => $ruta,
+                    'tipo_archivo' => $file->getMimeType(),
+                    'observacion' => $request->observaciones_archivo[$i] ?? null,
+                ]);
             }
         }
 
@@ -240,11 +214,15 @@ class ConsultaController extends Controller
             ->with('success', 'Consulta actualizada correctamente.');
     }
 
+    // ============================================================
+    // ELIMINAR CONSULTA
+    // ============================================================
     public function destroy($id)
     {
         $consulta = Consulta::findOrFail($id);
         $pacienteId = $consulta->paciente_id;
 
+        // borrar archivos
         foreach ($consulta->archivos as $arch) {
             Storage::disk('public')->delete($arch->ruta_archivo);
         }
@@ -256,6 +234,9 @@ class ConsultaController extends Controller
             ->with('success', 'Consulta eliminada.');
     }
 
+    // ============================================================
+    // DESCARGAR ARCHIVO
+    // ============================================================
     public function descargarArchivo(ConsultaArchivo $archivo)
     {
         return Storage::disk('public')->download(
@@ -264,18 +245,24 @@ class ConsultaController extends Controller
         );
     }
 
+    // ============================================================
+    // ELIMINAR ARCHIVO
+    // ============================================================
     public function deleteArchivo(ConsultaArchivo $archivo)
     {
         Storage::disk('public')->delete($archivo->ruta_archivo);
 
-        $consultaId = $archivo->consulta_id;
+        $id = $archivo->consulta_id;
         $archivo->delete();
 
         return redirect()
-            ->route('consultas.show', $consultaId)
-            ->with('success', 'Archivo eliminado correctamente.');
+            ->route('consultas.show', $id)
+            ->with('success', 'Archivo eliminado.');
     }
 
+    // ============================================================
+    // PDF COMPLETO
+    // ============================================================
     public function pdfConsultaCompleta(Consulta $consulta)
     {
         $consulta->load('paciente', 'archivos');

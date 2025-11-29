@@ -105,6 +105,13 @@ Route::middleware('auth')->group(function () {
     // ARCHIVOS SUBIDOS EN CONSULTA
     // ===================================================================
 
+    Route::get('/pacientes/{paciente}/ver', 
+    [PacienteController::class, 'verPaciente'])
+    ->name('pacientes.showpaciente');
+
+
+
+
     // Descargar archivo adjunto
     Route::get('/consultas/archivo/descargar/{archivo}',
         [ConsultaController::class, 'descargarArchivo'])
